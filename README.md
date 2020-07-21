@@ -99,7 +99,7 @@ The way the Wand tool works is mostly dependent on the sensitivity you set (edit
 When using either the Brush or the Wand tool, maintaining Alt on the keyboard while clicking will have the effect of erasing instead of drawing. This proves very useful when trying to remove everything that is external to the bone edge with the Wand tool, for example.
 
 
-#AdipoQuant
+# AdipoQuant
 
 ## Installing & Running AdipoQuant
 The AdipoQuant function was devised for the purpose of adipocyte segmentation in extramedullary adipose tissue samples. The script works with QuPath where projects can be created with raw image files (for example .vsi or .tiff formats).
