@@ -17,7 +17,7 @@ In the extracted zip archive, you will find within the folder the QuPath executa
 Download this repository and navigate to the ‘Setup’ directory.
 Add the contents of the ‘Extensions’ directory in the ‘Extensions’ directory from the QuPath download.
 Copy the “ij-plugins” directory to a location and keep track of it.
-Start QuPath
+Start QuPath. 
 In Help>Show setup options, make sure to uncheck the verification of updates at launch, as it is not recommended to use more recent versions of QuPath as they may be unsupported by MarrowQuant.
 Set the correct maximum amount of RAM you need. The typical value recommended is around three quarter of the maximum RAM that the computer possesses, depending on your usage of other programs simultaneously with QuPath.
 Go to Edit>Preferences, and enter the path of the QuPath Extensions folder under "Extensions directory", 
