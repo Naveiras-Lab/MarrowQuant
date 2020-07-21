@@ -14,15 +14,13 @@ In the extracted zip archive, you will find within the folder the QuPath executa
 
 ## Setting up QuPath 0.1.4 for MarrowQuant
 
-Download this repository and navigate to the ‘Setup’ directory.
-Add the contents of the ‘Extensions’ directory in the ‘Extensions’ directory from the QuPath download.
-Copy the “ij-plugins” directory to a location and keep track of it.
-Start QuPath. 
-In Help>Show setup options, make sure to uncheck the verification of updates at launch, as it is not recommended to use more recent versions of QuPath as they may be unsupported by MarrowQuant.
-Set the correct maximum amount of RAM you need. The typical value recommended is around three quarter of the maximum RAM that the computer possesses, depending on your usage of other programs simultaneously with QuPath.
-Go to Edit>Preferences, and enter the path of the QuPath Extensions folder under "Extensions directory", 
-In "ImageJ plugin directory",  enter the path of the "ij-plugins" folder 
-In "Script Directory", enter the path of the "Code" Directory of MarrowQuant
+1. Download this repository and navigate to the ‘Setup’ directory.
+2. Add the contents of the ‘Extensions’ directory in the ‘Extensions’ directory from the QuPath download.
+3. Copy the “ij-plugins” directory to a location and keep track of it.
+4. Start QuPath. 
+5. In Help>Show setup options, make sure to uncheck the verification of updates at launch, as it is not recommended to use more recent versions of QuPath as they may be unsupported by MarrowQuant.
+6. Set the correct maximum amount of RAM you need. The typical value recommended is around three quarter of the maximum RAM that the computer possesses, depending on your usage of other programs simultaneously with QuPath.
+7. Go to Edit>Preferences, and enter the path of the QuPath Extensions folder under "Extensions directory", in "ImageJ plugin directory",  enter the path of the "ij-plugins" folder in "Script Directory", enter the path of the "Code" Directory of MarrowQuant
 
 ## Creation of a project
 Users must create a QuPath project in order to work on the images of interest. It is important that you execute the next steps in the same order that is indicated.
@@ -103,13 +101,15 @@ When using either the Brush or the Wand tool, maintaining Alt on the keyboard wh
 
 ## Installing & Running AdipoQuant
 The AdipoQuant function was devised for the purpose of adipocyte segmentation in extramedullary adipose tissue samples. The script works with QuPath where projects can be created with raw image files (for example .vsi or .tiff formats).
-Steps from launch to results
+Steps from launch to results:
 
-## Create a project in QuPath.
-Define “Tissue Boundaries” and “Artifacts” annotations.
-Open the script: Automate/Shared scripts/AdipoQuant 
-Press Run to launch the processing.
-At the beginning of the script, the user may modify adipocyte parameters including the minimum size, maximum size, and minimum circularity of adipocytes. Recommended values are set by default to minimum size of 300µm2, maximum size of 15,000µm2, and minimum circularity of 0.0. The feature “exclude on edges” is by default set to true.
+## Create a project in QuPath
+1. Define “Tissue Boundaries” and “Artifacts” annotations.
+2. Open the script: Automate/Shared scripts/AdipoQuant 
+3. Press Run to launch the processing.
+4. At the beginning of the script, the user may modify adipocyte parameters including the minimum size, maximum size, and minimum circularity of adipocytes. 
+
+Recommended values are set by default to minimum size of 300µm2, maximum size of 15,000µm2, and minimum circularity of 0.0. The feature “exclude on edges” is by default set to true.
 
 ## Export Results 
 To export results, open and run the AdipoQuant_Export_Results script.
