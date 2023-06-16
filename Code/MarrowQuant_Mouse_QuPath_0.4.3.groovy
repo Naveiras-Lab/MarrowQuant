@@ -1,7 +1,8 @@
+
 // = CODE DESCRIPTION =
-// This series of scripts aims to quantify 4 parameters from H&E stained
-// bone sections. Bone, Adipocytes, Hematopoietic Cells and Interstitium
-// and microvasculature.
+// This series of scripts aims to quantify 5 parameters from H&E stained
+// bone sections. Bone, Adipocytes, Hematopoietic Cells, Interstitium
+// and microvasculature, and non-allocated area
 // 
 // == INPUTS ==
 // To run this code, you need to create multiple annotations in QuPath:
@@ -14,25 +15,25 @@
 // 
 // == OUTPUTS ==
 // The code produces multiple detections to illustrate the detected areas
-// the Detections are called Bone, Adipocytes, IMV, HematoCells.
+// the Detections are called Bone, Adipocytes, IMV, HematoCells, non allocated area.
 // Results of quantification as per the MarrowQuant paper are located as
 // measurements in the "Tissue Boundaries" annotation.
 //
 // = DEPENDENCIES =
 // MarrowQuant needs several jars to run properly. Please see the
 // installation instruction on GitHub: 
-// https://github.com/Naveiras-Lab/MarrowQuant/tree/qupath-0.1.4
+// https://github.com/Naveiras-Lab/MarrowQuant/tree/qupath-0.4.3
 // 
 // 
 // = AUTHOR INFORMATION =
-// Code initially written by Chiheb Boussema & Ibrahim Bekri, EPFL-SV-GRNAVEIRAS
+// Code initially written by Ibrahim Bekri and Rita Sarkis, EPFL-SV-GRNAVEIRAS
 // Code debugging, supervision and upgrade by Olivier Burri & Rita Sarkis
 // EPFL-SV-PTECH-BIOP, EPFL-SV-GRNAVEIRAS
-// for Josefine Tratwal, Naveiras-Lab
-// DATE
+// for Rita Sarkis, Naveiras-Lab
+// 20230616
 // 
 // = COPYRIGHT =
-// © All rights reserved. ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland, BioImaging And Optics Platform (BIOP), 2018
+// © All rights reserved. ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE, Switzerland, BioImaging And Optics Platform (BIOP), GR-NAVEIRAS-Laboratory of regenerative hematopoiesis 2019
 // 
 // Licensed under the BSD-3-Clause License:
 // Redistribution and use in source and binary forms, with or without modification, are permitted provided 
@@ -51,16 +52,11 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF 
 // ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Parameters to set 
-def downsample = 4
-def adipmin = 120
-def adipmax = 1000000000 
-def mincir = 0.3
-def individual_adip = true 
 
+// Need ImageJ
+def ij = IJExtension.getImageJInstance()
 
-
-// Start of Script
+ij.setVisible(true)
 
 all_regions = getAnnotationObjects()
 clearDetections()
@@ -70,47 +66,24 @@ def tissues = all_regions.findAll{ it.getPathClass() == getPathClass("Tissue Bou
 tissues.eachWithIndex{ tissue, k ->
     def mq = new MQBuilder().assignTissueAnnotation( tissue )
                             .assignTissueNumber( k ) 
-                            .assignDownsample( downsample )
-                            .assignAdipMin( adipmin )
-                            .assignAdipMax ( adipmax )
-                            .assignMinCir   ( mincir )
+                            .assignDownsample( 4 )
+                            .assignAdipMin( 120.0 )
+                            .assignAdipMax ( 1000000000 )
+                            .assignMinCir   ( 0.3 )
                             .assignExcludeOnEdges ( false )
                             .assignTestAP ( false )
-                            .assignGetIndividualAdipocytes ( individual_adip )
+                            .assignGetIndividualAdipocytes ( true )
                             .create()
     
     mq.run()
 }
 
+// Quit ImageJ
+ij.quit()
 
+// end of script// 
 
-import ij.*
-import ij.process.*
-import ij.measure.Measurements
-import ij.gui.*
-import ij.plugin.ImageCalculator
-import ij.plugin.Thresholder
-import ij.plugin.filter.ThresholdToSelection
-import ij.plugin.filter.ImageMath
-import ij.plugin.RGBStackConverter
-import ij.plugin.RoiEnlarger
-import ij.plugin.frame.RoiManager
-
-import sc.fiji.colourDeconvolution.*
-
-import groovy.transform.ToString
-import groovy.transform.builder.Builder
-import groovy.transform.builder.ExternalStrategy
-
-import qupath.lib.objects.*
-import qupath.imagej.objects.*
-import qupath.imagej.helpers.*
-import qupath.lib.roi.*
-import ch.epfl.biop.qupath.utils.*
-
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-
+// MarrowQnat class starts below
 @ToString(includeNames=true)
 class MarrowQuant {
     
@@ -150,20 +123,30 @@ class MarrowQuant {
     final private static Logger logger = LoggerFactory.getLogger( MarrowQuant.class ) 
     
     public void run() {
-    
+        def all_annotations = getAnnotationObjects()
+        // find tissue
+
+        // Fix Oli QuPath 0.2.0: Need to explicitely insert objects into hierarchy if it was not done        
+        // find background
+        this.backgroundAnnotation = getAllObjects().find{ it.getPathClass() == getPathClass("BG") }
+        insertObjects( this.backgroundAnnotation )
+        // find artifacts
+        def artifactAnnotations = getAllObjects().findAll{ it.getPathClass() == getPathClass("Artifact") }
+        insertObjects( artifactAnnotations )
+        
+        
         this.ic = new ImageCalculator()       
-        logger.info( "{}"   , this.adipMin )
         
         // Get annotations to use
         this.backgroundAnnotation = getAllObjects().find{ it.getPathClass() == getPathClass("BG") }
+
         //tissueAnnotation.getChildObjects()
         //tissueAnnotation.getChildObjects().find{ it.getPathClass() == getPathClass("BG") }
+        def tissue_artifacts = tissueAnnotation.getChildObjects().findAll{ it.getPathClass() == getPathClass("Artifact") }
         
-        this.mergedArtifactsAnnotation = mergeAnnotations( tissueAnnotation.getChildObjects().findAll{ it.getPathClass() == getPathClass("Artifact") } )
-        
-        println(this.mergedArtifactsAnnotation)
+        def mergedArtifactsAnnotation = PathUtils.merge( tissue_artifacts )
 
-        this.image = GUIUtils.getImagePlus( tissueAnnotation, downsample, false, false )
+        this.image = getImagePlus( tissueAnnotation, downsample)
                 
         this.artifactsRoi = getIJRoi( mergedArtifactsAnnotation )
                 
@@ -184,6 +167,8 @@ class MarrowQuant {
         adipFinder()
         
         sendResultsToQuPath()
+        
+        logger.info("MarrowQuant: finished")
     }  
     
     public void boneIMVFinder() {
@@ -224,7 +209,7 @@ class MarrowQuant {
 	
 	def boneProc = boneImage.getProcessor()
 	boneProc.setRoi( this.tissueRoi )
-	boneProc.setAutoThreshold("Triangle dark no-reset")
+	boneProc.setAutoThreshold("Default dark no-reset")
 	
 
 	def boneMaskProc = boneProc.createMask()
@@ -232,8 +217,8 @@ class MarrowQuant {
 	this.boneMaskImage = new ImagePlus("Bone Mask", boneMaskProc )
 
 	this.boneMaskImage.setCalibration( image.getCalibration() )
-	IJ.run( this.boneMaskImage, "Options...", "iterations=5 count=1 black pad do=Dilate");
-	IJ.run( this.boneMaskImage, "Options...", "iterations=15  count=2 black pad do=Close");
+	IJ.run( this.boneMaskImage, "Options...", "iterations=20 count=1 black pad do=Dilate");
+	IJ.run( this.boneMaskImage, "Options...", "iterations=30 count=2 black pad do=Close");
 
 	boneMaskProc.setBackgroundValue(0)
 
@@ -255,36 +240,42 @@ class MarrowQuant {
 	varianceProc.fillOutside( this.tissueRoi )
 	//Clear the Bone area
 	varianceProc.fill( this.boneRoi )
+    	
+		
 	
 	varianceProc.setRoi( this.tissueRoi )
-	varianceProc.setAutoThreshold("Li dark no-reset")
+	varianceProc.setAutoThreshold("Default dark no-reset")
 	def imvMaskProc = varianceProc.createMask()
+	
+	// Clear the artifacts
+        imvMaskProc.fill( this.artifactsRoi )
 
         this.imvMaskImage = new ImagePlus("IMV", imvMaskProc )
 	this.imvRoi = getRoiFromMask( imvMaskImage )
-	IJ.run( this.imvMaskImage, "Options...", "iterations=1 count=2 black pad do=Dilate") // best with Li
+	
         //this.imvMaskImage.setRoi( this.imvRoi )
         //imvMaskImage.show()   
     }
     
     def hematoFinder() {
-
-	
+	logger.info("Hemato Finder")
 	def hematoImage = this.ic.run( "Subtract create", this.deconvolved[2], this.deconvolved[0] )
-	
+
+
 	def hematoProc = hematoImage.getProcessor()
 		
 	hematoProc.smooth()
 	
 	hematoProc.setRoi( this.tissueRoi )
-	hematoProc.setAutoThreshold("Default dark")
+	//hematoProc.setAutoThreshold("Li dark")
+	hematoProc.setAutoThreshold("Li dark") // Oli: For the data I tested it on 2020.06.23 Li takes BG. Default works better. ?
 	
 	def hematoMaskProc = hematoProc.createMask()
 	
         this.hematoMaskImage = new ImagePlus("Hemato Mask", hematoMaskProc )
-        
+
 	this.hematoMaskImage.setCalibration( image.getCalibration() )
-	IJ.run( this.hematoMaskImage, "Options...", "iterations=2 count=2 black pad do=Dilate") // best with Li
+	IJ.run( this.hematoMaskImage, "Options...", "iterations=1  count=2  black pad do=Dilate") // best with Li
         //IJ.run( hematoMaskImage, "Options...", "iterations=1 count=1 black pad do=Dilate") // best Huang / Mean
       	//IJ.run( hematoMaskImage, "Options...", "iterations=1 count=5 black pad do=Dilate")
 	//IJ.run( hematoMaskImage, "Options...", "iterations=1 count=3 black pad do=Dilate")
@@ -304,10 +295,10 @@ class MarrowQuant {
         
 	this.hematoRoi = getRoiFromMask( hematoMaskImage )
         //this.hematoMaskImage.setRoi( this.hematoRoi )
-        //this.hematoMaskImage.show()
                 
 }
     public void adipFinder() {
+     	logger.info( "Adipocyte Finder" )
         def hsbImage = this.image.duplicate()
         
         // Convert to HSB
@@ -344,17 +335,17 @@ class MarrowQuant {
 	IJ.run( adipMaskImage, "Watershed", "")
 	IJ.run( adipMaskImage, "Options...", "iterations=50 count=5 pad do=Dilate" )
 	
-	adipMaskImage.show()
+	//adipMaskImage.show()
 	//IJ.setAutoThreshold( adipMaskImage, "Default" )
 	//Performs an enhanced version of Fiji's analyze particle
 	//IJ.log("Values: "+this.adipMin+", "+this.adipMax+", "+this.minCir)
-        IJ.run( adipMaskImage, "Invert LUT", "");
-	IJ.run( adipMaskImage, "Extended Particle Analyzer", "  area="+this.adipMin+"-"+this.adipMax+" circularity="+this.minCir+"-1.00 roundness=0.36-1.00 show=Masks redirect=None keep=None display" )
+        IJ.run( adipMaskImage, "Invert LUT", "")
+	//def IJ.run( adipMaskImage, "Extended Particle Analyzer", "  area="+this.adipMin+"-"+this.adipMax+" circularity="+this.minCir+"-1.00 roundness=0.36-1.00 show=Masks redirect=None keep=None display" )
 
 	//hide()
 
 	// Create Selection from the mask
-	def adipMaskImage2 = IJ.getImage()
+	def adipMaskImage2 = filterAdipocytes( adipMaskImage )
 	adipMaskImage2.unlock()
 	//adipMaskImage2.show()
 	//adipMaskProc.fill( this.artifactsRoi ) Oli Artifacts are already filler here
@@ -363,8 +354,8 @@ class MarrowQuant {
 	//adipMaskImage.close()
 	
 	 //this.adipMaskImage = adipMaskImage2.duplicate()
-	 adipMaskImage2.hide()
-	 adipMaskImage.hide()
+	 //adipMaskImage2.hide()
+	 //adipMaskImage.hide()
 	//IJ.run( adipMaskImage2, "Invert", "")
 	IJ.log("Getting ADIP Mask")
 	this.adipRoi = getRoiFromMask( adipMaskImage2 )
@@ -429,10 +420,10 @@ class MarrowQuant {
         def adip   = getQuPathPathObject(  this.adipRoi, adip_class ) 
         def artifacts   = getQuPathPathObject(  this.artifactsRoi, artifact_class )
         
-        this.tissueAnnotation.addPathObject( imv )
-        this.tissueAnnotation.addPathObject( hemato )
-        this.tissueAnnotation.addPathObject( bone )
-        this.tissueAnnotation.addPathObject( adip )
+        this.tissueAnnotation.addChildObject( imv )
+        this.tissueAnnotation.addChildObject( hemato )
+        this.tissueAnnotation.addChildObject( bone )
+        this.tissueAnnotation.addChildObject( adip )
    
         def area_tissue = this.tissueAnnotation.getROI().getArea()
     
@@ -461,35 +452,42 @@ class MarrowQuant {
         def denominator2 = area_adips + area_hemato
     
         // Computing the values need to calculate the outputs, that is the cellularity, adiposity, etc.
-        def cell1           = 100 * ( area_hemato / denominator1 )
+        def cell2           = 100 * ( area_hemato / denominator1 )
         def adipo           = 100 * ( area_adips / denominator1 )
         def IMVratio        = 100 * ( area_imv / denominator1 )
         def Unassigned      = 100 * ( area_unassigned / denominator1 )
-        def cell2           = 100 * ( area_hemato / denominator2 )
+        def cell1           = 100 * ( area_hemato / denominator2 )
+        
     
-        this.tissueAnnotation.getMeasurementList().clear();
+        this.tissueAnnotation.getMeasurementList().clear()
 	
         // Add measurements to each Tissue region
         def measurements = this.tissueAnnotation.getMeasurementList()
         
         def U = "um"
-        def px_size = Utils.getPixelSize()
-        measurements.putMeasurement("Tissue Number", this.tissueNumber)
-        measurements.putMeasurement("Area Hematopoietic ["+U+"^2]", area_hemato * px_size * px_size)
-        measurements.putMeasurement("Area Adipocytes ["+U+"^2]", area_adips * px_size * px_size )
-        measurements.putMeasurement("Area IMV (interstitium and microvasculature) ["+U+"^2]", area_imv * px_size * px_size )
-        measurements.putMeasurement("Area Bone ["+U+"^2]",  area_bone * px_size * px_size )
-        measurements.putMeasurement("Area of Total Tissue ["+U+"^2]", area_tissue * px_size * px_size )
-        measurements.putMeasurement("Area Of Artifacts ["+U+"^2]", area_artifacts * px_size * px_size)
-        measurements.putMeasurement("Area Unassigned ["+U+"^2]", area_unassigned * px_size * px_size)	
-        measurements.putMeasurement("% Cellularity (Hematopoietic area/(Marrow area))", cell1)
-        measurements.putMeasurement("% Adiposity (Adipocytic area/(Marrow area))", adipo)
-        measurements.putMeasurement("% IMV area (Interstitium & microvasculature/(Marrow area))", IMVratio)
-        measurements.putMeasurement("% Unassigned area(Unassigned/(Marrow area))", Unassigned)
-        measurements.putMeasurement("% Ratio hemato/(hemato+adipo)", cell2)
-        measurements.putMeasurement("Min Size", adipMin)
-        measurements.putMeasurement("Max Size", adipMax)
-        measurements.putMeasurement("Min Circularity", minCir)
+        def px_size = getCurrentServer().getMetadata().getAveragedPixelSize()
+        measurements.putMeasurement( "Sample Number", this.tissueNumber )
+        measurements.putMeasurement( "Hm.Ar_"+U+"^2", round( area_hemato * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "Tt.Ad.Ar_"+U+"^2", round( area_adips * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "It.Ar_"+U+"^2", round( area_imv * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "B.Ar_"+U+"^2",  round( area_bone * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "T.Bd.Ar_"+U+"^2", round( area_tissue * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "Art.Ar_"+U+"^2", round( area_artifacts * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "Un.Ar_"+U+"^2", round( area_unassigned * px_size * px_size, 0 ) )
+        measurements.putMeasurement( "Ma.Ar_"+U+"^2", round( ( area_hemato + area_adips + area_imv ) * px_size * px_size ,0 ) )	
+        measurements.putMeasurement( "Hm.Ar/Ma.Ar_%_Equation_2", round( cell2, 2 ) )
+        measurements.putMeasurement( "Tt.Ad.Ar/Ma.Ar_%", round( adipo, 2 ) )
+        measurements.putMeasurement( "It.Ar/Ma.Ar_%", round( IMVratio, 2 ) )
+        measurements.putMeasurement( "Un.Ar/Ma.Ar_%", round( Unassigned, 2 ) )
+        measurements.putMeasurement( "Hm.Ar/(Hm.Ar+Tt.Ad.Ar)_%_Equation_1", round( cell1, 2 ) )
+        measurements.putMeasurement( "Ad_Min_Size", adipMin )
+        measurements.putMeasurement( "Ad_Max_Size", adipMax )
+        measurements.putMeasurement( "Ad_Min_Circularity", minCir )
+        
+
+        
+
+        
     
         // Setting of the colors to all the annotations and detections
         imv_class.setColor( imv_color )
@@ -513,25 +511,42 @@ class MarrowQuant {
             def rois = rm.getRoisAsArray() as List
             
             rois.eachWithIndex{ roi, idx -> 
-                this.tissueAnnotation.addPathObject( getQuPathPathObject( roi, aadip_class ) )
+                this.tissueAnnotation.addChildObject( getQuPathPathObject( roi, aadip_class ) )
             }
-                    measurements.putMeasurement( "Total Adipocytes", rois.size())
+                            measurements.putMeasurement( "Aj.Ad.N", rois.size() )
+                            measurements.putMeasurement("Ad.MA.Ar_Nby_"+U+"^2", rois.size()/ round( ( area_hemato + area_adips + area_imv ) * px_size * px_size ,0 ) )
+            rm.close()
         }
         
+        // Cleanup
+
+        WindowManager.closeAllWindows()
         fireHierarchyUpdate()
     
-    }   
+    }
     
+    def getImagePlus( pathObject, downsample ) {
+        def server = getCurrentServer()
+        def request = RegionRequest.createInstance( server.getPath(), downsample, pathObject.getROI() )
+        def pathImage = IJTools.convertToImagePlus( server, request )
+        return pathImage.getImage()
+    }
+	
+    // convenience function to round results
+    public double round( def number, int places ) {
+        return new BigDecimal( number ).setScale( places, RoundingMode.HALF_UP ).doubleValue()
+    }
+
     public PathObject getQuPathPathObject( Roi roi, def theClass ) {
         def cal = this.image.getCalibration()
-        def qROI = ROIConverterIJ.convertToPathROI( roi, cal, this.downsample, -1, 0, 0 )
-        //qROI = ShapeSimplifierAwt.simplifyShape( qROI, this.downsample )
+        def qROI = IJTools.convertToROI( roi, cal, this.downsample, null )
+        qROI = ShapeSimplifier.simplifyShape( qROI, this.downsample )
         def det = new PathDetectionObject( qROI, theClass )
-        det.getMeasurementList().putMeasurement("Area "+Utils.um+"^2", roi.getStatistics().area *  cal.pixelWidth * cal.pixelWidth)
+        det.getMeasurementList().putMeasurement("Area "+GeneralTools.micrometerSymbol()+"^2", roi.getStatistics().area *  cal.pixelWidth * cal.pixelWidth)
         return det  
     } 
     public Roi getIJRoi( PathObject object )  {
-        return ROIConverterIJ.convertToIJRoi( object.getROI(), this.image.getCalibration(), this.downsample )
+        return IJTools.convertToIJRoi( object.getROI(), this.image.getCalibration(), this.downsample )
     } 
     
     // Use Color Deconvolution Plugin in MarrowQuant
@@ -560,6 +575,36 @@ class MarrowQuant {
         return new ThresholdToSelection().convert( proc )
         
     }
+    
+    // Oli 2020.06.23: This removes the need for the extended particle analyzer. Rita's dream come true :)
+    public ImagePlus filterAdipocytes(ImagePlus adip_mask) {
+        
+        IJ.run(adip_mask, "Analyze Particles...", "size="+this.adipMin+"-"+this.adipMax+" circularity="+this.minCir+"-1.00 clear add show=Masks")
+        def mask = IJ.getImage()
+        mask.hide()
+        def rm = RoiManager.getRoiManager()
+        def rois = rm.getRoisAsArray() as List
+
+        def min_round = 0.36 // Hard coded by Ibrahim Berki
+
+        def round_rois = rois.findAll{ 
+	    def stats = it.getStatistics()
+	    //roundess defines as 4*area/pi*sqr(major axis)
+	    def round = ( 4*stats.area) /( Math.PI * Math.pow(stats.major,2))
+
+	    return round > min_round
+	}
+	// Re-add rois to Roi manager
+        rm.reset()
+
+        round_rois.each{ rm.addRoi(it) }
+	IJ.setForegroundColor(0, 0, 0)
+        IJ.run( mask, "Set...", "value=0")
+        rm.runCommand( mask,"Fill")
+     	//IJ.setForegroundColor(255, 255, 255)
+        return mask
+    }
+
     
     // Reimplemented Color Balance Class
     public ImagePlus colorBalance( ImagePlus image, Roi roi ) {
@@ -639,4 +684,40 @@ class MQBuilder {
         getIndividualAdipocytes = true
     }
 }
+
+// All imports at the bottom, for readability of script
+
+
+import ij.*
+import ij.process.*
+import ij.measure.Measurements
+import ij.gui.*
+import ij.plugin.ImageCalculator
+import ij.plugin.Thresholder
+import ij.plugin.filter.ThresholdToSelection
+import ij.plugin.filter.ImageMath
+import ij.plugin.RGBStackConverter
+import ij.plugin.RoiEnlarger
+import ij.plugin.frame.RoiManager
+import ij.WindowManager
+
+import sc.fiji.colourDeconvolution.*
+
+import groovy.transform.ToString
+import groovy.transform.builder.Builder
+import groovy.transform.builder.ExternalStrategy
+ 
+import qupath.ext.biop.utils.*
+
+import qupath.imagej.tools.*
+import qupath.lib.objects.*
+import qupath.imagej.objects.*
+import qupath.imagej.helpers.*
+import qupath.lib.roi.*
+import ch.epfl.biop.qupath.utils.*
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import qupath.imagej.gui.IJExtension 
+import java.math.RoundingMode
 
