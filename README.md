@@ -1,6 +1,13 @@
 # MarrowQuant
-MarrowQuant is a user-friendly algorithm for the quantification of H&amp;E bone marrow tissue biopsies in whole slide images, implemented as a series of QuPath Scripts. Keywords: Digital Pathology, Whole slide Imaging, QuPath, Bone Marrow
+MarrowQuant is a user-friendly algorithm for the quantification of H&amp;E bone marrow tissue biopsies in whole slide images, implemented as a series of QuPath Scripts. 
+
+Keywords: Digital Pathology, Whole slide Imaging, QuPath, Bone Marrow
 http://qupath.github.io 
+
+It is linked to the following publication:
+> Tratwal, Josefine, David Bekri, Chiheb Boussema, Rita Sarkis, Nicolas Kunz, Tereza Koliqi, Shanti Rojas-Sutterlin, et al. "MarrowQuant Across Aging and Aplasia: A Digital Pathology Workflow for Quantification of Bone Marrow Compartments in Histological Sections." Frontiers in Endocrinology 11 (September 24, 2020): 480. https://doi.org/10.3389/fendo.2020.00480.
+
+And the data related to the publication are available thought the [Image Data Resource (IDR) under "idr0096"](https://idr.openmicroscopy.org/webclient/?show=project-2102)
  
 # Installing & Running MarrowQuant
 MarrowQuant is a script initially developed as a plugin integrated in the image processing software Fiji/ImageJ and adapted afterwards for QuPath using Fiji as an extension and groovy language for scripting. We will first outline QuPath installation steps, and then we will describe how to use MarrowQuant within QuPath.
