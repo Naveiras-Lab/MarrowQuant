@@ -78,7 +78,7 @@ mq_classes.each { the_class ->
     }
 }    
 
-getQuPath().getAvailablePathClasses().setAll(all_classes)
+Platform.runLater{ getQuPath().getAvailablePathClasses().setAll(all_classes) }
 fireHierarchyUpdate()
 
 def ij = IJExtension.getImageJInstance()
@@ -105,7 +105,7 @@ tissues.eachWithIndex{ tissue, i ->
 }
 
 fireHierarchyUpdate()	
-def imageName = getCurrentImageData().getServer().getShortServerName()
+def imageName = getCurrentImageNameWithoutExtension()
 println("Processing complete for " +  imageName );
 //ij.quit()
 
@@ -121,8 +121,11 @@ class AdipocyteDetector {
         IJ.run("Close All")
         
         // Returns the image as an ImageJ ImagePlus object with ROIs and the overlay
-        def image = GUIUtils.getImagePlus(tissue, this.downsample, true, true)
-        
+        def request = RegionRequest.createInstance( getCurrentServerPath(), this.downsample, tissue.getROI() )
+        def pathImage = IJExtension.extractROIWithOverlay(getCurrentServer(), tissue, getCurrentHierarchy(), request, true, getCurrentViewer().getOverlayOptions());		
+
+        def image = pathImage.getImage()
+
         // Pick up pixel size
         def px_size = image.getCalibration().pixelWidth
         
@@ -146,24 +149,17 @@ class AdipocyteDetector {
         IJ.run(hsb_image, "HSB Stack", "")
         hsb_image.show()
         
-        // Call Color Deconvolution and recover the images (must be done through GUI for now)
-        IJ.run(image, "Colour Deconvolution", "vectors=H&E hide")
-        
-        //Pickup the images for later processing
-        def col1 = WindowManager.getImage( image.getTitle()+"-(Colour_1)" )
-        def col2 = WindowManager.getImage( image.getTitle()+"-(Colour_2)" )
-        def col3 = WindowManager.getImage( image.getTitle()+"-(Colour_3)" )
-        
+        // Call Color Deconvolution and recover the images )
+        def cols = colorDeconvolution( image, "H&E" )
+                
         // Creates the final image we are going to process from the hue and brightness image obtained
         def ic = new ImageCalculator()
-        def adip_raw_image = ic.run("Subtract create", col3, col1)
+        def adip_raw_image = ic.run("Subtract create", cols[2], cols[0])
         
         adip_raw_image.show()
         
         image.close()
-        col1.close()
-        col2.close()
-        col3.close()
+        cols.each{ it.close() }
         
         def saturation = hsb_image.getStack().getProcessor(2) // Saturation is the second image
         saturation.multiply(8)
@@ -181,7 +177,10 @@ class AdipocyteDetector {
         IJ.run( adip_mask, "Invert", "") // IB?
         IJ.run( adip_mask, "Watershed", "" )
         adip_mask.show()
+
+                
         IJ.run( adip_mask, "Options...", "iterations=50 count=5 pad do=Erode" )
+
 
         adip_mask.setRoi( all_edges )
         //IJ.run(adip_mask, "Make Inverse", "")
@@ -192,25 +191,29 @@ class AdipocyteDetector {
         def rm = RoiManager.getInstance() ?: new RoiManager()
         // Save as Detections in QuPath
         def adips = rm.getRoisAsArray() as List
-        rm.runCommand("Reset")    
+        rm.reset()
         rm.close()
+        
+        def um = GeneralTools.micrometerSymbol()
+        
         def total_area = 0
 
 	// Measurement of adipocytes areas and displaying of the data in QuPath
         adips.eachWithIndex{ adip, idx ->
-            def qu_adip = ROIConverterIJ.convertToPathROI( adip, image.getCalibration(), this.downsample, 0,0,0)
-            def det = new PathDetectionObject(qu_adip, getPathClass("Adipocyte"))            
+            def det = IJTools.convertToDetection( adip, this.downsample, image )
+            det.setPathClass( getPathClass("Adipocyte") )
             def area = adip.getStatistics().area
             det.getMeasurementList().putMeasurement( "Adipocyte Index", idx+1 )
-            det.getMeasurementList().putMeasurement( "Area "+Utils.um+"^2", area *  px_size *  px_size )
+            det.getMeasurementList().putMeasurement( "Area "+um+"^2", area *  px_size *  px_size )
             
-            tissue.addPathObject(det)
+            tissue.addChildObject(det)
             total_area += area
         }
         
-        tissue.getMeasurementList().clear();
-        tissue.getMeasurementList().putMeasurement( "Total Adipocyte Area "+Utils.um+"^2", total_area *  px_size *  px_size )       
+        tissue.getMeasurementList().clear()
+        tissue.getMeasurementList().putMeasurement( "Total Adipocyte Area "+um+"^2", total_area *  px_size *  px_size )       
         Interpreter.batchMode = false
+        fireHierarchyUpdate()
     }
         
 	// Excludes the artifacts from the ROI we want to process
@@ -219,20 +222,20 @@ class AdipocyteDetector {
             return tissue_roi 
         }
         
-        if (artifacts.size > 0) {
+        if (artifacts.size() > 0) {
             
             def rm = RoiManager.getInstance() ?: new RoiManager()
-            rm.runCommand("Reset")    
+            rm.reset()    
             artifacts.each{ rm.addRoi(it) }
             def all_artifacts
-            if ( artifacts.size == 1 ) {
+            if ( artifacts.size() == 1 ) {
                 all_artifacts = artifacts[0]
             } else {
                 rm.setSelectedIndexes((0..rm.getCount()-1) as int[])
                 rm.runCommand(image, "OR")
                 all_artifacts = image.getRoi()
             }
-            rm.runCommand("Reset")
+            rm.reset()
             // AND then XOR with tissue
             IJ.log(""+all_artifacts)
             rm.addRoi(all_artifacts)
@@ -243,13 +246,32 @@ class AdipocyteDetector {
             rm.addRoi( overlap_artifacts )
             rm.setSelectedIndexes([1,2] as int[])
             rm.runCommand(image, "XOR")
+            rm.reset()
             rm.close()
             return image.getRoi()
         }
     }
+    
+    // Use Color Deconvolution Plugin in MarrowQuant
+    public ImagePlus[] colorDeconvolution ( ImagePlus image, String stain ) {
+            def cd = new Colour_Deconvolution()
+            def matList = cd.getStainList()
+            def mt = matList.get( stain )
+            def stackList = mt.compute( false, true, image )
+            // This returns an array of ImageStacks
+            
+            // Make into an ImagePlus            
+            def imageStack = new ImageStack( stackList[0].getWidth(), stackList[0].getHeight() )
+            
+            stackList.each { imageStack.addSlice( it.getProcessor( 1 ) ) }
+            
+            def deconvolved = stackList.collect{ new ImagePlus( image.getTitle()+"-"+stain, it ) }
+            
+            return deconvolved      
+    }
 }
-// Import BIOP library to do fun things
-import ch.epfl.biop.qupath.utils.*
+
+
 import ij.IJ
 import sc.fiji.colourDeconvolution.*
 import ij.WindowManager
@@ -258,16 +280,13 @@ import ij.ImagePlus
 import ij.process.ImageProcessor
 import ij.plugin.frame.RoiManager
 import qupath.lib.objects.PathDetectionObject
-import qupath.imagej.objects.ROIConverterIJ
 import ij.macro.Interpreter
-import ch.epfl.biop.qupath.utils.Utils
+import ij.ImageStack
 import ij.gui.Roi
 import qupath.imagej.gui.IJExtension
-import qupath.lib.gui.helpers.DisplayHelpers
-import qupath.imagej.helpers.*
-import qupath.lib.roi.PathObjectToolsAwt
-import qupath.lib.objects.PathAnnotationObject
 
+import qupath.imagej.helpers.*
+import qupath.lib.objects.PathAnnotationObject
 
 
 
