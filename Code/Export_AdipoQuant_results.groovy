@@ -9,13 +9,14 @@
 
 
 
-import ch.epfl.biop.qupath.utils.*
+import qupath.ext.biop.utils.Results
 
 
 selectDetections();
 runPlugin('qupath.lib.plugins.objects.ShapeFeaturesPlugin', '{"area": false,  "perimeter": true,  "circularity": true,  "useMicrons": true}');
 
-def um = Utils.um
+def um = GeneralTools.micrometerSymbol()
+
 def columns = ["Adipocyte Index", "Parent", "Area "+um+"^2"]
 
 def resultsfolder = buildFilePath(PROJECT_BASE_DIR, "results")
@@ -25,6 +26,6 @@ def resultsfile = new File(resultsfolder, "adipocyte-measurements.txt")
 println(resultsfile.getAbsolutePath())
 
 def detections = getDetectionObjects()
-Utils.sendResultsToFile(columns, detections,  resultsfile)
+Results.sendResultsToFile(columns, detections,  resultsfile)
 
 println("Completed")

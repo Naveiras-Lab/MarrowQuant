@@ -37,7 +37,7 @@ def outputPath = buildFilePath( PROJECT_BASE_DIR, 'results' )
 mkdirs( outputPath )
 
 // Give the results file a name
-def fileName = 'MarrowQuant_Results.txt'
+def fileName = 'MarrowQuant_Results_20230721_final.txt'
 
 // Write results in the desired directory to the desired filename
 def file = new File( outputPath, fileName )
@@ -54,12 +54,12 @@ def columns = [ "Image Name",
                 "Tt.Ad.Ar_"+U+"^2",
                 "It.Ar_"+U+"^2",
                 "Ma.Ar_"+U+"^2",
-                "Other.Ar_"+U+"^2",
+                "Un.Ar_"+U+"^2",
                 "Hm.Ar/(Hm.Ar+Tt.Ad.Ar)_%_Equation_1",
                 "Hm.Ar/Ma.Ar_%_Equation_2",
                 "Tt.Ad.Ar/Ma.Ar_%",
                 "It.Ar/Ma.Ar_%",
-                "Other.Ar/Ma.Ar_%",
+                "Un.Ar/Ma.Ar_%",
                 "Aj.Ad.N",
                 "Ad_Min_Size",
                 "Ad_Max_Size", 

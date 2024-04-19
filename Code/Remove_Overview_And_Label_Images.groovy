@@ -7,21 +7,10 @@
  * but otherwise everything kept the same.
  */
 
-import qupath.lib.gui.QuPathGUI
-import qupath.lib.gui.panels.ProjectBrowser
-import qupath.lib.images.ImageData
-import qupath.lib.images.servers.ImageServerProvider
-import qupath.lib.io.PathIO
-import qupath.lib.projects.Project
-import qupath.lib.projects.ProjectIO
-
-import java.awt.image.BufferedImage
-
 // Get the running QuPath instance
-def qupath = QuPathGUI.getInstance()
-
+def qupath = getQuPath()
 // Get the current project
-def project = qupath.getProject()
+def project = getProject()
 if (project == null) {
     println("No project open!")
     return
@@ -36,11 +25,6 @@ for (def entry in project.getImageList()) {
 }
 
 sleep(1000)
-getQuPath().refreshProject()
-ProjectIO.writeProject(project)
+qupath.refreshProject()
+
 fireHierarchyUpdate()
-
-// Write the new project itself
-//ProjectIO.writeProject(projectNew)
-
-print("Done! Project written to ")

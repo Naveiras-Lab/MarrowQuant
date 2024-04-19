@@ -83,9 +83,9 @@ ij.quit()
 
 // end of script// 
 
-// MarrowQnat class starts below
+// MarrowQuat class starts below
 @ToString(includeNames=true)
-class MarrowQuant {
+class MarrowQuant1 {
     
     def downsample       = 4
     def adipMin 	 = 5
@@ -120,7 +120,7 @@ class MarrowQuant {
     def boneMaskImage
     def hematoMaskImage
     
-    final private static Logger logger = LoggerFactory.getLogger( MarrowQuant.class ) 
+    final private static Logger logger = LoggerFactory.getLogger( MarrowQuant1.class ) 
     
     public void run() {
         def all_annotations = getAnnotationObjects()
@@ -144,7 +144,14 @@ class MarrowQuant {
         //tissueAnnotation.getChildObjects().find{ it.getPathClass() == getPathClass("BG") }
         def tissue_artifacts = tissueAnnotation.getChildObjects().findAll{ it.getPathClass() == getPathClass("Artifact") }
         
-        def mergedArtifactsAnnotation = PathUtils.merge( tissue_artifacts )
+        // Merge artifacts for later use
+        def hasMerged = mergeAnnotations( tissue_artifacts )
+        def mergedArtifactsAnnotation
+        if( hasMerged ) {
+            mergedArtifactsAnnotation = getSelectedObject()
+        } else {
+           mergedArtifactsAnnotation = tissue_artifacts[0] 
+        }
 
         this.image = getImagePlus( tissueAnnotation, downsample)
                 
@@ -515,6 +522,7 @@ class MarrowQuant {
             }
                             measurements.putMeasurement( "Aj.Ad.N", rois.size() )
                             measurements.putMeasurement("Ad.MA.Ar_Nby_"+U+"^2", rois.size()/ round( ( area_hemato + area_adips + area_imv ) * px_size * px_size ,0 ) )
+            rm.reset()
             rm.close()
         }
         
@@ -670,7 +678,7 @@ class MarrowQuant {
 }
 
 // The lines below allow us to user the Builder Pattern withourh having to declare it in the MarrowQuant class
-@Builder(builderStrategy = ExternalStrategy, forClass = MarrowQuant, prefix = 'assign', buildMethodName = 'create')
+@Builder(builderStrategy = ExternalStrategy, forClass = MarrowQuant1, prefix = 'assign', buildMethodName = 'create')
 class MQBuilder {
     MQBuilder() {
         downsample       = 4
